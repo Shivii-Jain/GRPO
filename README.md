@@ -1,76 +1,66 @@
-# GRPO
+# Group-Normalized Policy Optimization for LLM Fine-Tuning
 
-GRPO is a Reinforecement Learning algorithm for training LLMs. It stands for Group Relative Policy Optimization.
+A compact, reproducible PyTorch study of critic-free, group-relative policy gradients for a controlled GPT-Neo-125M analogy-completion task. It is intentionally small enough to inspect end-to-end.
 
-GRPO generates multiple answers and instead of estimating value & using critic (like PPO), it computes relative performance.
+## What this repository implements
 
-For each prompt:
+- **GRPO-style policy gradient:** sample `G` completions per prompt; use each completion's reward relative to its group mean; optionally normalize by the within-group standard deviation.
+- **Frozen-reference regularization:** a sampled KL estimate penalizes divergence from the initial GPT-Neo policy.
+- **Padding-safe generated-token log probabilities:** the objective masks prompt positions and scores only generated tokens. This is important because left-padded batches cannot use each item's non-padding prompt length as an absolute token index.
+- **Fairer evaluation:** four complete analogy templates are held out by seed. No repeated instance of a held-out relation enters training.
+- **Baselines:** pretrained GPT-Neo (reported before training), supervised fine-tuning (SFT), and REINFORCE without relative group advantages. PPO is deliberately **not** claimed or included.
 
-- Sample G different outputs from the current model.
-- Compute rewards for each output.
-- Compute the average reward in the group.
-- For each output:
-  
-      Advantage ≈ reward – group_average
-  
-So:
-- Outputs better than group average => positive advantage => increase probability.
-- Outputs worse than group average => negative advantage => decrease probability.
+## Quick start
 
-We learn only by contrasting answers inside group. This is why it is called Group Relative optimization. Group itself acts as 'judge'.
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python run_experiments.py --config configs/base.yaml
+```
 
-## Setup
+This executes GRPO-style, REINFORCE, and SFT runs for three fixed seeds. It writes a checkpoint, per-step `training.csv`, per-run `metrics.json`, and aggregate `artifacts/summary.json`.
 
-- Agent / Policy: GPT-Neo-125M model.
+To run a single experiment:
 
-- Environment: your analogy prompts.
+```bash
+python train.py --algorithm grpo --seed 7 --config configs/base.yaml
+```
 
-- State: the prompt string.
+> GPT-Neo-125M weights are downloaded from Hugging Face on the first run. The runner automatically selects CUDA, Apple Silicon's MPS GPU backend, or CPU, in that order. Metrics record peak allocated VRAM when CUDA is available.
 
-- Action: the next one word the model outputs.
+## Objective
 
-- Reward:
+For prompt \(x_i\), sampled responses \(y_{i,g}\), and binary reward \(r_{i,g}\), this project uses
 
-  - 1 if the word is in the correct target list (e.g., "cunning" for fox)
+\[
+A_{i,g} = \frac{r_{i,g} - \operatorname{mean}_g(r_{i,g})}{\operatorname{std}_g(r_{i,g}) + \epsilon}
+\]
 
-  - 0 otherwise.
+and minimizes
 
-- Objective: change the policy so that correct words are more likely.
+\[
+\mathcal{L} = -\mathbb{E}[A_{i,g}\log\pi_\theta(y_{i,g}|x_i)]
+ + \beta\,\mathbb{E}[\log\pi_\theta(y_{i,g}|x_i)-\log\pi_{ref}(y_{i,g}|x_i)].
+\]
 
-## Training
+The reward is 1 when the first generated word exactly matches an accepted target and 0 otherwise. `max_new_tokens: 1` keeps the task and token-level accounting deliberately controlled.
 
-For each batch of prompts:
+## Reporting protocol
 
-- For each prompt, generate G = 4 possible answers (actions).
+Use `artifacts/summary.json` to report mean ± population standard deviation across the configured seeds. Never report a single run as a final comparison. Include the template-disjoint exact-match score, runtime, peak VRAM, seed list, config, and baseline results.
 
-- For each answer, compute reward (1 or 0).
+Run the complete, seed-controlled ablation grid with:
 
-- Compute group mean reward for each prompt.
+```bash
+python run_ablations.py
+```
 
-- Convert reward-to-advantage:
+`configs/ablations.yaml` varies group size, KL coefficient, and advantage normalization while retaining the same seeds and template-split procedure. Its aggregate table is written to `artifacts/ablations/summary.json`.
 
-  - If answer’s reward is above group mean → positive advantage.
+## Limitations
 
-  - If below → negative.
+This is a controlled educational benchmark, not a general LLM-alignment result. The 20 manually curated analogy templates, binary exact-match reward, one-token completion, and small model limit external validity. A template-disjoint split is stricter than repeated-template evaluation, but it is still too small to establish broad reasoning generalization.
 
-- Compute a loss that:
+The implementation is **GRPO-style**, not a reproduction of every production GRPO detail: it has no clipped importance-ratio surrogate, multi-turn rollout, reward model, or distributed training. It also does not implement PPO; accordingly, this repository makes no PPO performance or compute claim.
 
-  - increases probability of answers with positive advantage,
-
-  - decreases probability of answers with negative advantage.
-
-- Add a KL penalty to keep policy close to the original model.
-
-- Update model parameters (policy).
-
-Over many steps:
-
-- The model learns to answer:
-
-  - fox → “cunning”
-
-  - fish → “swim”
-
-  - son → “child”
-
-- Result: baseline reward 0.15 → GRPO reward 0.8.
+See [DESIGN.md](DESIGN.md) for design choices and interviewer-ready discussion points.
