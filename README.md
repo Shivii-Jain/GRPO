@@ -63,4 +63,3 @@ This is a controlled educational benchmark, not a general LLM-alignment result. 
 
 The implementation is **GRPO-style**, not a reproduction of every production GRPO detail: it has no clipped importance-ratio surrogate, multi-turn rollout, reward model, or distributed training. It also does not implement PPO; accordingly, this repository makes no PPO performance or compute claim.
 
-See [DESIGN.md](DESIGN.md) for design choices and interviewer-ready discussion points.
