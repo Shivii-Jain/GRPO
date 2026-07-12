@@ -1,0 +1,17 @@
+# Fast functional check; not an experiment configuration.
+model_name: EleutherAI/gpt-neo-125M
+seed: 7
+seeds: [7]
+baselines: [grpo]
+steps: 1
+batch_size: 2
+group_size: 2
+beta_kl: 0.1
+normalize_advantages: true
+learning_rate: 1.0e-5
+max_grad_norm: 1.0
+max_new_tokens: 1
+held_out_templates: 4
+train_repeats: 1
+eval_repeats: 1
+eval_batch_size: 4

@@ -1,0 +1,5 @@
+# Run one row at a time by copying its values into base.yaml; this prevents
+# accidental comparison of experiments with changed seeds or data splits.
+group_size: [2, 4, 8]
+beta_kl: [0.0, 0.03, 0.1, 0.3]
+normalize_advantages: [true, false]
