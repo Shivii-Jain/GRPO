@@ -1,4 +1,4 @@
-"""Deterministic analogy data with template-disjoint train/evaluation splits."""
+#Deterministic analogy data with template-disjoint train/evaluation splits
 from __future__ import annotations
 
 import random
@@ -43,7 +43,7 @@ TEMPLATES = (
 
 
 def split_templates(seed: int, held_out_templates: int = 4) -> tuple[list[AnalogyTemplate], list[AnalogyTemplate]]:
-    """Return a template-disjoint split; no relation appears in both partitions."""
+    # Return a template-disjoint split; no relation appears in both partitions.
     if not 0 < held_out_templates < len(TEMPLATES):
         raise ValueError("held_out_templates must be between 1 and len(TEMPLATES)-1")
     order = list(TEMPLATES)
